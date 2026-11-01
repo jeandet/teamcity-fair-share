@@ -45,7 +45,8 @@ read on every pass, no restart needed:
 gradle build    # → build/distributions/fair-share.zip
 ```
 
-Upload the zip in Administration → Plugins, then restart the server.
+Upload the zip in Administration → Plugins and enable it. No restart is needed: the plugin
+supports runtime reload, so updates and removal are live too.
 
 Built against TeamCity 2026.2, Java 17 bytecode.
 

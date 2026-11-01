@@ -37,6 +37,7 @@ public final class FairShareQueue extends BuildServerAdapter {
     private static final int HISTORY_HALF_LIVES = 5;
 
     private final SBuildServer server;
+    private final EventDispatcher<BuildServerListener> events;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         var thread = new Thread(r, "fair-share-queue");
         thread.setDaemon(true);
@@ -46,7 +47,14 @@ public final class FairShareQueue extends BuildServerAdapter {
 
     public FairShareQueue(EventDispatcher<BuildServerListener> events, SBuildServer server) {
         this.server = server;
+        this.events = events;
         events.addListener(this);
+    }
+
+    // Called by Spring when the plugin is unloaded at runtime, so a reload leaves no stale listener.
+    public void dispose() {
+        events.removeListener(this);
+        worker.shutdownNow();
     }
 
     @Override
@@ -57,11 +65,6 @@ public final class FairShareQueue extends BuildServerAdapter {
     @Override
     public void buildFinished(@NotNull SRunningBuild build) {
         schedule();
-    }
-
-    @Override
-    public void serverShutdown() {
-        worker.shutdownNow();
     }
 
     // Reordering runs off TeamCity's event thread; a burst of events collapses into one pass.
