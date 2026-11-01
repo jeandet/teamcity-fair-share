@@ -25,6 +25,21 @@ Internal properties (Administration → Diagnostics → Internal Properties), re
 | `teamcity.fairShare.enabled` | `true` | `false` stops all reordering, immediately |
 | `teamcity.fairShare.halfLifeHours` | `12` | How fast past usage is forgotten |
 
+## Metrics
+
+The plugin adds three metrics to TeamCity's own Prometheus endpoint, `/app/metrics`, one series
+per top-level project (label `project`, the project's external id):
+
+| Metric | Type | Meaning |
+|---|---|---|
+| `fairshare_usage` | gauge | Recent agent-seconds, decayed by the half-life: the number the ordering uses |
+| `fairshare_queued` | gauge | Builds of the project waiting in the queue |
+| `fairshare_queue_wait_milliseconds` | histogram | How long builds waited between queued and started |
+
+Projects only, on purpose: metrics often end up on shared dashboards, and per-user numbers
+would expose who builds what. Scraping `/app/metrics` needs a TeamCity user with the
+"View usage statistics" permission.
+
 ## The algorithm
 
 ### 1. Who a build belongs to

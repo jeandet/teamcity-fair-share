@@ -77,6 +77,18 @@ class FairShareTest {
     }
 
     @Test
+    void projectUsageSumsItsUsers() {
+        var usage = Map.of(new Owner("phare", "alice"), 10.0, new Owner("phare", "bob"), 5.0, new Owner("other", "carol"), 1.0);
+        assertEquals(Map.of("phare", 15.0, "other", 1.0), FairShare.byProject(usage));
+    }
+
+    @Test
+    void queuedBuildsAreCountedPerProject() {
+        var queue = List.of(item("p1", "phare", "alice"), item("p2", "phare", "bob"), item("o1", "other"));
+        assertEquals(Map.of("phare", 2L, "other", 1L), FairShare.queuedPerProject(queue));
+    }
+
+    @Test
     void usageDecaysByHalfLife() {
         var now = Instant.parse("2026-11-01T12:00:00Z");
         var halfLife = Duration.ofHours(12);

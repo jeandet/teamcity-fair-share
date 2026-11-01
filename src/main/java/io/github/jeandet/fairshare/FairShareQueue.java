@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import jetbrains.buildServer.metrics.ServerMetrics;
 import jetbrains.buildServer.serverSide.BuildEstimates;
 import jetbrains.buildServer.serverSide.BuildPromotion;
 import jetbrains.buildServer.serverSide.BuildServerAdapter;
@@ -44,10 +45,12 @@ public final class FairShareQueue extends BuildServerAdapter {
         return thread;
     });
     private final AtomicBoolean scheduled = new AtomicBoolean();
+    private final FairShareMetrics metrics;
 
-    public FairShareQueue(EventDispatcher<BuildServerListener> events, SBuildServer server) {
+    public FairShareQueue(EventDispatcher<BuildServerListener> events, SBuildServer server, ServerMetrics serverMetrics) {
         this.server = server;
         this.events = events;
+        this.metrics = new FairShareMetrics(serverMetrics);
         events.addListener(this);
     }
 
@@ -55,11 +58,17 @@ public final class FairShareQueue extends BuildServerAdapter {
     public void dispose() {
         events.removeListener(this);
         worker.shutdownNow();
+        metrics.dispose();
     }
 
     @Override
     public void buildTypeAddedToQueue(@NotNull SQueuedBuild build) {
         schedule();
+    }
+
+    @Override
+    public void buildStarted(@NotNull SRunningBuild build) {
+        metrics.recordWait(projectOf(build), Duration.between(build.getQueuedDate().toInstant(), build.getStartDate().toInstant()));
     }
 
     @Override
@@ -82,6 +91,7 @@ public final class FairShareQueue extends BuildServerAdapter {
             var usage = FairShare.usage(charges(now, halfLife), now, halfLife);
             var queue = server.getQueue();
             var items = queue.getItems().stream().map(this::toQueueItem).toList();
+            metrics.publish(FairShare.byProject(usage), FairShare.queuedPerProject(items), now, halfLife);
             var order = FairShare.order(items, usage);
             if (!order.equals(items.stream().map(QueueItem::id).toList())) {
                 queue.applyOrder(order.toArray(String[]::new));
@@ -152,12 +162,12 @@ public final class FairShareQueue extends BuildServerAdapter {
     private String projectOf(SBuild build) {
         return Optional.ofNullable(server.getProjectManager().findProjectById(build.getProjectId()))
                 .map(FairShareQueue::topLevelProject)
-                .orElse(build.getProjectId());
+                .orElse(build.getProjectExternalId());
     }
 
     // Shares are per top-level project, so a project's subprojects share one budget.
     private static String topLevelProject(SProject project) {
         var path = project.getProjectPath();
-        return path.get(Math.min(1, path.size() - 1)).getProjectId();
+        return path.get(Math.min(1, path.size() - 1)).getExternalId();
     }
 }

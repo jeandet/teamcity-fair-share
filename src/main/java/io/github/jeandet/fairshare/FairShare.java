@@ -1,5 +1,6 @@
 package io.github.jeandet.fairshare;
 
+import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.summingDouble;
 import static java.util.stream.Collectors.toCollection;
@@ -60,6 +61,15 @@ public final class FairShare {
     public static Map<Owner, Double> usage(List<Charge> charges, Instant now, Duration halfLife) {
         return charges.stream().collect(groupingBy(Charge::owner,
                 summingDouble(c -> c.seconds() * decay(Duration.between(c.at(), now), halfLife))));
+    }
+
+    public static Map<String, Double> byProject(Map<Owner, Double> usage) {
+        return usage.entrySet().stream()
+                .collect(groupingBy(e -> e.getKey().project(), summingDouble(Map.Entry::getValue)));
+    }
+
+    public static Map<String, Long> queuedPerProject(List<QueueItem> queue) {
+        return queue.stream().collect(groupingBy(i -> i.owner().project(), counting()));
     }
 
     private static double decay(Duration age, Duration halfLife) {
