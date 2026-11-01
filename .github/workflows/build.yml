@@ -1,0 +1,50 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14"
+      - name: Build and test
+        run: gradle --no-daemon build -PpluginVersion="${VERSION#v}"
+        env:
+          VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fair-share
+          path: build/distributions/fair-share.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fair-share
+      - name: Create the release
+        run: |
+          sha=$(sha256sum fair-share.zip | cut -d' ' -f1)
+          gh release create "$GITHUB_REF_NAME" fair-share.zip --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" --generate-notes \
+            --notes "Install: TeamCity → Administration → Plugins → Upload plugin zip → Enable. No restart needed. sha256 \`$sha\`"
+        env:
+          GH_TOKEN: ${{ github.token }}

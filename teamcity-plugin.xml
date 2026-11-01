@@ -4,7 +4,7 @@
     <info>
         <name>fair-share</name>
         <display-name>Fair-share build queue</display-name>
-        <version>0.2.0</version>
+        <version>${version}</version>
         <description>Orders the build queue so projects that used the CI least recently go first.</description>
         <vendor>
             <name>Alexis Jeandet</name>

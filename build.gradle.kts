@@ -4,6 +4,9 @@ plugins {
 
 val teamcityVersion = "2026.2"
 
+// Release builds pass -PpluginVersion=<tag without the v>; local builds are "dev".
+version = providers.gradleProperty("pluginVersion").getOrElse("dev")
+
 repositories {
     mavenCentral()
     maven("https://download.jetbrains.com/teamcity-repository")
@@ -27,7 +30,7 @@ tasks.test {
 val pluginZip by tasks.registering(Zip::class) {
     archiveFileName = "fair-share.zip"
     destinationDirectory = layout.buildDirectory.dir("distributions")
-    from("teamcity-plugin.xml")
+    from("teamcity-plugin.xml") { expand("version" to project.version) }
     into("server") { from(tasks.jar) }
 }
 

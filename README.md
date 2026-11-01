@@ -128,6 +128,11 @@ No local JDK? Run Gradle in a container:
 podman run --rm -v "$PWD":/w:Z -w /w docker.io/library/gradle:8.14-jdk21 gradle --no-daemon build
 ```
 
+Local builds are versioned `dev`. GitHub Actions builds and tests every push and pull request.
+
+To release, push a tag: `git tag v0.3.0 && git push origin v0.3.0`. The workflow builds the
+plugin with version `0.3.0` and publishes the GitHub release with `fair-share.zip` attached.
+
 The ordering logic (`FairShare.java`) has no TeamCity types and is unit-tested on its own.
 `FairShareQueue.java` connects it to TeamCity.
 
