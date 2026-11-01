@@ -1,6 +1,7 @@
 # teamcity-fair-share
 
-A TeamCity server plugin that orders the build queue by fair share between projects.
+A TeamCity server plugin that orders the build queue by fair share: between projects, then
+between users inside each project.
 
 TeamCity's queue is first-in first-out, adjusted by static priority classes. When one project
 floods the queue, everyone else waits behind it. This plugin re-sorts the queue so that the
@@ -9,13 +10,19 @@ waiting, the busy project still gets every agent.
 
 ## How it works
 
-1. Each time a build is queued or finishes, the plugin computes every top-level project's
-   recent usage, in agent-seconds. Finished builds count for their duration, halved every
-   half-life (12 hours by default). Running builds count for their estimated duration.
-2. It builds the new queue one build at a time: take the next build of the project with the
-   least usage, then add that build's estimated duration to the project's usage.
-3. Builds of the same project keep their relative order. Ties keep TeamCity's order.
-4. It applies the new order only if it differs from the current one.
+1. Each build is charged to an owner: its top-level project, and a user inside that project.
+   The user is whoever clicked Run. Otherwise it is the TeamCity account matched to the
+   author of the build's change (through the e-mails and VCS usernames set on accounts), or
+   the raw VCS author when no account matches. Scheduled builds without changes go to
+   `automatic`.
+2. Each time a build is queued or finishes, the plugin computes every owner's recent usage,
+   in agent-seconds. Finished builds count for their duration, halved every half-life
+   (12 hours by default). Running builds count for their estimated duration.
+3. It builds the new queue one build at a time: take the next build of the least-served
+   project, and inside it of the least-served user, then add that build's estimated duration
+   to both.
+4. Builds of the same owner keep their relative order. Ties keep TeamCity's order.
+5. It applies the new order only if it differs from the current one.
 
 This is weighted fair queuing, the same idea as fair-share schedulers in batch systems. Running
 builds are never interrupted, so a newly queued build still waits for the next free agent.

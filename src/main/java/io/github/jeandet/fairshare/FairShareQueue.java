@@ -2,6 +2,7 @@ package io.github.jeandet.fairshare;
 
 import com.intellij.openapi.diagnostic.Logger;
 import io.github.jeandet.fairshare.FairShare.Charge;
+import io.github.jeandet.fairshare.FairShare.Owner;
 import io.github.jeandet.fairshare.FairShare.QueueItem;
 import java.time.Duration;
 import java.time.Instant;
@@ -12,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import jetbrains.buildServer.serverSide.BuildEstimates;
+import jetbrains.buildServer.serverSide.BuildPromotion;
 import jetbrains.buildServer.serverSide.BuildServerAdapter;
 import jetbrains.buildServer.serverSide.BuildServerListener;
 import jetbrains.buildServer.serverSide.SBuild;
@@ -21,6 +23,9 @@ import jetbrains.buildServer.serverSide.SProject;
 import jetbrains.buildServer.serverSide.SQueuedBuild;
 import jetbrains.buildServer.serverSide.SRunningBuild;
 import jetbrains.buildServer.serverSide.TeamCityProperties;
+import jetbrains.buildServer.serverSide.TriggeredBy;
+import jetbrains.buildServer.users.SUser;
+import jetbrains.buildServer.vcs.SVcsModification;
 import jetbrains.buildServer.util.EventDispatcher;
 import org.jetbrains.annotations.NotNull;
 
@@ -86,11 +91,11 @@ public final class FairShareQueue extends BuildServerAdapter {
 
     private List<Charge> charges(Instant now, Duration halfLife) {
         var charges = new ArrayList<Charge>();
-        server.getRunningBuilds().forEach(b -> charges.add(new Charge(projectOf(b), runningCost(b), now)));
+        server.getRunningBuilds().forEach(b -> charges.add(new Charge(ownerOf(b), runningCost(b), now)));
         var since = now.minus(halfLife.multipliedBy(HISTORY_HALF_LIVES));
         server.getHistory().processEntries(b -> {
             var finished = b.getFinishDate().toInstant();
-            charges.add(new Charge(projectOf(b), agentSeconds(b, b.getDuration()), finished));
+            charges.add(new Charge(ownerOf(b), agentSeconds(b, b.getDuration()), finished));
             return finished.isAfter(since);
         });
         return charges;
@@ -107,7 +112,9 @@ public final class FairShareQueue extends BuildServerAdapter {
 
     private QueueItem toQueueItem(SQueuedBuild build) {
         var estimate = build.getBuildPromotion().isCompositeBuild() ? 0 : estimateSeconds(build);
-        return new QueueItem(build.getItemId(), topLevelProject(build.getBuildType().getProject()), estimate);
+        var owner = new Owner(topLevelProject(build.getBuildType().getProject()),
+                userOf(build.getTriggeredBy(), build.getBuildPromotion()));
+        return new QueueItem(build.getItemId(), owner, estimate);
     }
 
     private static long estimateSeconds(SQueuedBuild build) {
@@ -116,6 +123,27 @@ public final class FairShareQueue extends BuildServerAdapter {
                 .map(t -> t.getDurationSeconds())
                 .filter(s -> s > 0)
                 .orElse(UNKNOWN_ESTIMATE_SECONDS);
+    }
+
+    private Owner ownerOf(SBuild build) {
+        return new Owner(projectOf(build), userOf(build.getTriggeredBy(), build.getBuildPromotion()));
+    }
+
+    // Who clicked Run, else the TeamCity account matched to the author of the build's first listed
+    // change, else that author's raw VCS name.
+    // simplify: looks up the changes of every finished build in the history window on each pass;
+    // cache the owner by build id if the history walk shows up in thread dumps.
+    private static String userOf(TriggeredBy trigger, BuildPromotion promotion) {
+        return Optional.ofNullable(trigger.getUser())
+                .map(SUser::getUsername)
+                .or(() -> promotion.getContainingChanges().stream().findFirst().map(FairShareQueue::authorOf))
+                .orElse("automatic");
+    }
+
+    private static String authorOf(SVcsModification change) {
+        return change.getCommitters().stream().findFirst()
+                .map(SUser::getUsername)
+                .orElse(change.getUserName());
     }
 
     private String projectOf(SBuild build) {
