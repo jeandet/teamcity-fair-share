@@ -48,3 +48,10 @@ gradle build    # → build/distributions/fair-share.zip
 Upload the zip in Administration → Plugins, then restart the server.
 
 Built against TeamCity 2026.2, Java 17 bytecode.
+
+## Live check
+
+Tested on TeamCity 2026.2.1 in a throwaway container with no agents, so builds stay queued.
+`scripts/queue-order-check.sh <super-user-token>` creates two projects and two users, queues
+builds and prints the resulting order next to the expected one. The super user token is
+printed in `teamcity-server.log`.
