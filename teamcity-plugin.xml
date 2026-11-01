@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<teamcity-plugin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:noNamespaceSchemaLocation="urn:schemas-jetbrains-com:teamcity-plugin-v1-xml">
+    <info>
+        <name>fair-share</name>
+        <display-name>Fair-share build queue</display-name>
+        <version>0.1.0</version>
+        <description>Orders the build queue so projects that used the CI least recently go first.</description>
+        <vendor>
+            <name>Alexis Jeandet</name>
+            <url>https://github.com/jeandet/teamcity-fair-share</url>
+        </vendor>
+    </info>
+    <deployment use-separate-classloader="true" allow-runtime-reload="false"/>
+</teamcity-plugin>
